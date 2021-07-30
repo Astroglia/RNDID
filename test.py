@@ -23,5 +23,8 @@ data_decoder.decode_dataset( truncated_datafile )
 dpacket = data_decoder.decoded_data_packets[0:10]
 for d in dpacket:
     print( d.to_string() )
+
+    print( d.print_data() )
+
 # for packet in data_decoder.decoded_data_packets:
 #     print( packet.to_string() )
