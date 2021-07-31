@@ -1,13 +1,25 @@
-from typing import List
-
+from typing import List, Iterable
+import numpy as np
 import c_dtype_utils
 from nfx_extended_header import NEURAL_NFX_EXTENDED_HEADER_GROUP
 from nfx_standard_header import NEURAL_NFX_STANDARD_HEADER
+
+# TODO:
+    # - timestamp management
+    # - electrode ID association with bulk data ( even though its 1:1, should still have something that states this )
 
 class NEURAL_NFX_ELECTRODE_DATA:
     def __init__(self):
         self.data:          List[float] = []
         self.electrode_id:  str         = None
+
+class NEURAL_NFX_ELECTRODE_BULK_DATA:
+    def __init__( self, electrode_list_data: List[NEURAL_NFX_ELECTRODE_DATA]) :
+        dat_arrs = [ x.data for x in electrode_list_data ]
+        min_list_len =  min(map(len, dat_arrs))
+        electrode_list_data = [ x[0:min_list_len] for x in dat_arrs  ]
+
+        self.numpy_data = np.array(electrode_list_data)
 
 class NEURAL_NFX_DATA_SINGLE_PACKET:
     def __init__(self, channels: int):
@@ -18,6 +30,8 @@ class NEURAL_NFX_DATA_SINGLE_PACKET:
         self.number_of_datapoints:  int = None
 
         self.all_electrode_data:    List[ NEURAL_NFX_ELECTRODE_DATA ] = [ NEURAL_NFX_ELECTRODE_DATA() for i in range(channels ) ]
+        # TODO after electrode bulk data has been populated, get rid of all-electrode-data to save memory
+        self.electrode_bulk_data:   NEURAL_NFX_ELECTRODE_BULK_DATA  = None
 
         self.channels:              int = channels
 
@@ -48,6 +62,8 @@ class NEURAL_NFX_DATA_SINGLE_PACKET:
         except IndexError:
             print( "index error @ index : ", i )
             pass
+
+        self.electrode_bulk_data = NEURAL_NFX_ELECTRODE_BULK_DATA( self.all_electrode_data )
 
         # self.number_of_datapoints = c_dtype_utils.decode_uint32( self.raw_packet[0:4] )
         # self.raw_packet = self.raw_packet[4:]
@@ -85,7 +101,7 @@ class NEURAL_NFX_DATA_SINGLE_PACKET:
 
 class NEURAL_NFX_DATA_DECODE:
     def __init__(self, standard_header: NEURAL_NFX_STANDARD_HEADER, extended_header: NEURAL_NFX_EXTENDED_HEADER_GROUP):
-        self.decoded_data_packets:      List[NEURAL_NFX_DATA_SINGLE_PACKET] = []
+        self.decoded_data_packets:      List[NEURAL_NFX_DATA_SINGLE_PACKET]     = []
 
         self.header             = standard_header
         self.extended_header    = extended_header
@@ -103,10 +119,12 @@ class NEURAL_NFX_DATA_DECODE:
             print("warning - data size does not divide up correctly; may have (overall) incorrect data or corruption near the end of the data file.")
             print(" data file length: ", len(truncated_data_file) )
             print(" single data packet length", single_packet_length )
+            print(" After decoding all electrode data is converted to a numpy array. the list with the least amount of data will be what all data is \n truncated to")
             print("---------------------------------------------------------------------------------------------------------------------------------")
 
         data_packet = NEURAL_NFX_DATA_SINGLE_PACKET( self.header.channel_count )
         data_packet.decode_packet( truncated_data_file )
+
         self.decoded_data_packets.append( data_packet )
 
         # try:
