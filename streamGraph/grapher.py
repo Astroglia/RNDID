@@ -15,7 +15,11 @@ from matplotlib.figure import Figure
 
 
 ## works on any dimensional image.
-def normalize_numpy_array(numpy_img, cap_outliers=False):
+def normalize_numpy_array(numpy_img, cap_outliers=False, checknan: bool = False ):
+    if checknan:
+        nan_data = np.isnan( numpy_img )
+        numpy_img[nan_data] = 0
+#        numpy_img[nanLocals] = np.average( numpy_img )
     if cap_outliers:
         mean = np.mean(numpy_img.flatten())  # Get mean/sdev
         sdev = np.std(numpy_img.flatten())
@@ -38,8 +42,8 @@ class MatplotlibWidget:
         self.offsets = 200
         self.num_channels       = num_channels
         self.points_to_plot     = sampling_frequency * 5
-        if self.points_to_plot > 10000:
-            self.points_to_plot = 10000
+        if self.points_to_plot > 5000:
+            self.points_to_plot = 5000
         self.graph_dataset      = np.random.random_integers(low=-2000, high=2000, size=(self.num_channels, self.points_to_plot))
         self.graph_dataset      = self.graph_dataset * 0
         self.time_axis          = np.array(list(range(self.points_to_plot)))
@@ -146,7 +150,7 @@ class MatplotlibWidget:
 
 
 class sequentialDataGrapher:
-    def __init__( self, data: np.ndarray = None, data_channels: int = 8, sampling_frequency: int = 10000):
+    def __init__( self, data: np.ndarray = None, data_channels: int = 8, sampling_frequency: int = 5000):
         """
         :param data_channels:           number of electrodes recorded
         :param sampling_frequency:      frequency the data is sampled at
@@ -159,8 +163,11 @@ class sequentialDataGrapher:
         if data.shape[1] == data_channels:
             data = np.swapaxes( data, 0, 1 )
 
+        nan_data = np.isnan( data )
+        data[nan_data] = 0
+
         # normalize dataset ; cap large outlier values
-        data = normalize_numpy_array( data, cap_outliers = False  )
+        data = normalize_numpy_array( data, cap_outliers = True  )
 
         # we want to add new data available every ~20 milliseconds, so:
         # take the sampling frequency to get 20 milliseconds # of datapoints, split the data into that
@@ -174,6 +181,12 @@ class sequentialDataGrapher:
                 self.concat_split_queue.put( data[ ..., i:(i+int(num_datapoints_in_20ms) ) ] )
         except IndexError:
             print("index error splitting concat list; still moving along")
+
+        print("----------- data setup for plotting -----------")
+        print("packet insertion shape: " + str([ data_channels, int(num_datapoints_in_20ms) ] ) )
+        print("num packets before rollover: " + str( self.concat_split_queue.qsize() ) )
+        print("packet insertion rate: " + str( self.plotting_interval_ms ) )
+        print("-----------------------------------------------")
 
         self.is_plotting = False
         self.dthread = threading.Thread(target=self._dplotter)
