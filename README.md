@@ -3,7 +3,7 @@ data decoding for Ripple Neuros .nfx file specification. Not affiliated with Rip
 
 ### does it work yet?
 
-- nah
+- maybe.
 
 ### why is it slow?
 
